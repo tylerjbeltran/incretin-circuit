@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Inside the incretin circuit — YourHealthRx</title>
+<style>
+  :root {
+    --bg: #0b1014;
+    --panel: #12181f;
+    --line: #24303a;
+    --text: #e8eef2;
+    --muted: #8b9aa6;
+    --teal: #3db8b0;
+    --amber: #e0a24b;
+    --danger: #c45c4a;
+    --dim: #1a232c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; }
+  button, input { font: inherit; }
+  .app { display: grid; grid-template-columns: 300px 1fr; grid-template-rows: 1fr auto; height: 100%; }
+  .side { padding: 22px 20px 16px; border-right: 1px solid var(--line); background: linear-gradient(180deg, #0e1419 0%, #0b1014 100%); display: flex; flex-direction: column; gap: 16px; }
+  .brand { color: var(--teal); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
+  h1 { font-size: 28px; line-height: 1.15; margin: 0; font-weight: 650; letter-spacing: -.02em; }
+  .dek, .note { color: var(--muted); }
+  .dek { margin: 0; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .stat { background: var(--dim); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .stat b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 11px; }
+  .note { font-size: 13px; min-height: 72px; }
+  .meters { display: flex; flex-direction: column; gap: 10px; }
+  .meter label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .bar { height: 6px; background: #1c262e; border-radius: 99px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--teal); border-radius: 99px; transition: width .2s linear; }
+  .bar.amber i { background: var(--amber); }
+  .bar.danger i { background: var(--danger); }
+  .foot { margin-top: auto; color: var(--muted); font-size: 11px; }
+  .foot a { color: var(--teal); text-decoration: none; }
+  .stage { position: relative; overflow: hidden; background:
+    radial-gradient(1200px 500px at 70% 20%, rgba(61,184,176,.08), transparent 55%),
+    linear-gradient(#10161c, #0b1014); }
+  svg { width: 100%; height: 100%; display: block; }
+  .hud { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  .seg { display: flex; background: rgba(18,24,31,.92); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { background: none; color: var(--muted); border: 0; padding: 8px 11px; cursor: pointer; }
+  .seg button.on { color: var(--text); background: #1c2730; }
+  .hint { position: absolute; left: 18px; bottom: 64px; color: var(--muted); font-size: 12px; }
+  .slider { position: absolute; left: 18px; right: 18px; bottom: 16px; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
+  .slider input { flex: 1; accent-color: var(--amber); }
+  .node { cursor: pointer; }
+  .node circle, .node ellipse, .node rect { stroke: #31404c; stroke-width: 1.5; fill: #182028; }
+  .node.active circle, .node.active ellipse, .node.active rect { stroke: var(--teal); }
+  .label { fill: #c9d5dc; font-size: 12px; font-family: inherit; pointer-events: none; }
+  .sub { fill: #8b9aa6; font-size: 10px; font-family: inherit; pointer-events: none; }
+  .flow { fill: none; stroke-width: 2; opacity: .9; }
+  .ghost { opacity: .22; }
+  .exploded .cluster { transition: transform .45s ease; }
+  .tip { position: absolute; max-width: 260px; background: #151c23; border: 1px solid var(--line); padding: 10px 12px; border-radius: 8px; color: var(--text); font-size: 12px; display: none; pointer-events: none; }
+  .tip b { display: block; margin-bottom: 4px; }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+    .side { border-right: 0; border-bottom: 1px solid var(--line); }
+    h1 { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">YourHealthRx</div>
+    <h1>Inside the incretin circuit</h1>
+    <p class="dek">Almost everybody has seen a GLP-1 ad. Almost nobody has seen the loop it acts on. Open it up. Follow the peptide. Raise the signal yourself.</p>
+    <div class="stats">
+      <div class="stat"><b id="sHalf">~2 min</b><span>intact t½</span></div>
+      <div class="stat"><b id="sReach">10–15%</b><span>intact to plasma</span></div>
+      <div class="stat"><b id="sBind">meal-gated</b><span>release / occupancy</span></div>
+    </div>
+    <p class="note" id="note">Native GLP-1 is released from ileal and colonic L-cells after a meal. DPP-4 destroys most of it before distant receptors ever see it.</p>
+    <div class="meters">
+      <div><label>Satiety signal <b id="mSat">0</b></label><div class="bar"><i id="bSat"></i></div></div>
+      <div><label>Gastric emptying speed <b id="mGe">baseline</b></label><div class="bar amber"><i id="bGe"></i></div></div>
+      <div><label>Insulin (glucose-dependent) <b id="mIns">low</b></label><div class="bar"><i id="bIns"></i></div></div>
+      <div><label>Nausea / AP signal <b id="mNau">low</b></label><div class="bar danger"><i id="bNau"></i></div></div>
+    </div>
+    <div class="foot">Education, not a protocol. Compounded medications are not FDA-approved. Eligibility and prescribing are determined by a licensed clinician.<br><br><a href="https://yourhealthrx.us/glp-1">yourhealthrx.us/glp-1</a></div>
+  </aside>
+  <main class="stage" id="stage">
+    <svg viewBox="0 0 1100 720" id="scene">
+      <defs>
+        <linearGradient id="gTeal" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3db8b0" stop-opacity=".15"/><stop offset="1" stop-color="#3db8b0"/></linearGradient>
+        <linearGradient id="gAmber" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e0a24b" stop-opacity=".2"/><stop offset="1" stop-color="#e0a24b"/></linearGradient>
+        <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <ellipse id="body" cx="560" cy="370" rx="210" ry="290" fill="#141c23" stroke="#2a3844" />
+      <g id="world">
+        <path id="pNative" class="flow" d="M430 470 C 470 430, 520 400, 560 360 C 600 320, 640 250, 690 210" stroke="url(#gTeal)" />
+        <path id="pAnalog" class="flow" d="M430 470 C 500 455, 560 430, 610 390 C 670 340, 720 280, 760 230" stroke="url(#gAmber)" />
+        <path id="pVagus" class="flow" d="M430 400 C 480 340, 530 280, 690 210" stroke="#5d7a86" stroke-dasharray="5 6" />
+        <g class="cluster" data-part="lcell">
+          <g class="node" data-id="lcell" transform="translate(400 470)">
+            <ellipse rx="54" ry="28" />
+            <text class="label" x="-34" y="4">L-cell</text>
+            <text class="sub" x="-34" y="18">ileum / colon</text>
+          </g>
+        </g>
+        <g class="cluster" data-part="dpp4">
+          <g class="node" data-id="dpp4" transform="translate(520 400)">
+            <rect x="-40" y="-18" width="80" height="36" rx="8" />
+            <text class="label" x="-22" y="4">DPP-4</text>
+          </g>
+        </g>
+        <g class="cluster" data-part="pancreas">
+          <g class="node" data-id="pancreas" transform="translate(610 390)">
+            <ellipse rx="58" ry="30" />
+            <text class="label" x="-34" y="0">Pancreas</text>
+            <text class="sub" x="-34" y="14">β / α islet</text>
+          </g>
+        </g>
+        <g class="cluster" data-part="stomach">
+          <g class="node" data-id="stomach" transform="translate(430 400)">
+            <ellipse rx="48" ry="26" />
+            <text class="label" x="-30" y="4">Stomach</text>
+          </g>
+        </g>
+        <g class="cluster" data-part="ap">
+          <g class="node" data-id="ap" transform="translate(690 210)">
+            <rect x="-50" y="-20" width="100" height="40" rx="8" />
+            <text class="label" x="-40" y="-2">AP / NTS</text>
+            <text class="sub" x="-40" y="12">hindbrain CVO</text>
+          </g>
+        </g>
+        <g class="cluster" data-part="arc">
+          <g class="node" data-id="arc" transform="translate(760 230)">
+            <ellipse rx="52" ry="26" />
+            <text class="label" x="-34" y="0">Arcuate</text>
+            <text class="sub" x="-34" y="14">POMC / AgRP</text>
+          </g>
+        </g>
+      </g>
+    </svg>
+    <div class="hud">
+      <div class="seg" id="follow">
+        <button data-v="all" class="on">All</button>
+        <button data-v="native">Native GLP-1</button>
+        <button data-v="analog">Analog</button>
+      </div>
+      <div class="seg" id="view">
+        <button data-v="whole" class="on">Whole</button>
+        <button data-v="cutaway">Cutaway</button>
+        <button data-v="exploded">Exploded</button>
+      </n>
+      <div class="seg" id="state">
+        <button data-v="fasted" class="on">Fasted</button>
+        <button data-v="fed">Fed</button>
+      </div>
+    </div>
+    <div class="hint">Click a part. Drag the signal. Switch cutaway / exploded.</div>
+    <div class="slider">
+      <span>Receptor signal</span>
+      <input id="signal" type="range" min="0" max="100" value="35" />
+      <b id="sigVal">35</b>
+    </div>
+    <div class="tip" id="tip"></div>
+  </main>
+</div>
+<script>
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const state = { follow: 'all', view: 'whole', fed: false, signal: 35, hover: null };
+const copy = {
+  lcell: ['L-cell', 'Enteroendocrine L-cells in the distal small intestine and colon release GLP-1 when nutrients arrive. Almost all stored peptide is intact.'],
+  dpp4: ['DPP-4', 'Dipeptidyl peptidase-4 cleaves native GLP-1 in the gut capillaries and liver. Intact plasma t½ is about 1–2 minutes. Only ~10–15% reaches systemic circulation intact.'],
+  pancreas: ['Pancreas', 'GLP-1R on β-cells raises cAMP and increases insulin only when glucose is high. Glucagon from α-cells falls through intra-islet mechanisms.'],
+  stomach: ['Stomach', 'Gastric emptying slows through vagal afferents. The effect is strong acutely. Long-acting agonists show tachyphylaxis with chronic use.'],
+  ap: ['Area postrema / NTS', 'Peripherally dosed analogs reach circumventricular organs and adjacent NTS. They do not freely cross the blood-brain barrier. This node also drives nausea.'],
+  arc: ['Arcuate nucleus', 'Weight-loss signaling is mostly reduced energy intake, not higher energy expenditure. POMC/CART neurons sit on this axis.']
+};
+const notes = {
+  whole: 'The intact loop. Meal-triggered native GLP-1 is brief. An analog is built to occupy the same receptor family for about a week.',
+  cutaway: 'Cut open. Follow native peptide through DPP-4, or follow a DPP-4-resistant analog to pancreas, stomach, and hindbrain.',
+  exploded: 'One receptor family. Several jobs: insulin, glucagon, emptying, satiety, and the nausea tradeoff.',
+  native: 'Native GLP-1 is a short local pulse. Most of it never reaches distant receptors. That is why the hormone itself is not a weekly drug.',
+  analog: 'Long-acting analogs resist DPP-4 and bind albumin. Half-life is about one week. Access to brain is through CVOs, not free BBB crossing.',
+  fed: 'A meal turns L-cells on. Native flow increases. Insulin can rise because glucose is present.',
+  fasted: 'L-cells are quiet. Insulin stays low even if analog signal is high — the β-cell effect is glucose-dependent.'
+};
+function setSeg(id, val) {
+  $$('#' + id + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === val));
+}
+function explainer() {
+  if (state.hover && copy[state.hover]) return copy[state.hover][1];
+  if (state.view === 'exploded') return notes.exploded;
+  if (state.follow === 'native') return notes.native;
+  if (state.follow === 'analog') return notes.analog;
+  if (state.fed) return notes.fed;
+  if (state.view === 'cutaway') return notes.cutaway;
+  if (!state.fed) return notes.fasted;
+  return notes.whole;
+}
+function meters() {
+  const analog = state.follow !== 'native';
+  const nativeOn = state.fed && state.follow !== 'analog';
+  const occ = analog ? state.signal / 100 : 0;
+  const nativePulse = nativeOn ? 0.22 : 0;
+  const sat = Math.min(100, Math.round((occ * 78 + nativePulse * 20)));
+  const geSlow = Math.min(100, Math.round(occ * 62 + nativePulse * 28));
+  const geSpeed = 100 - geSlow;
+  const insulin = state.fed ? Math.min(100, Math.round(occ * 70 + nativePulse * 25)) : Math.round(occ * 8);
+  const nau = Math.min(100, Math.round(occ * 55));
+  $('#mSat').textContent = sat + '%';
+  $('#bSat').style.width = sat + '%';
+  $('#mGe').textContent = geSpeed > 70 ? 'fast' : geSpeed > 40 ? 'slowing' : 'slow';
+  $('#bGe').style.width = geSpeed + '%';
+  $('#mIns').textContent = state.fed ? (insulin > 55 ? 'up' : 'modest') : 'low';
+  $('#bIns').style.width = insulin + '%';
+  $('#mNau').textContent = nau > 60 ? 'up' : nau > 30 ? 'possible' : 'low';
+  $('#bNau').style.width = nau + '%';
+  if (state.follow === 'native') {
+    $('#sHalf').textContent = '~1–2 min';
+    $('#sReach').textContent = '10–15%';
+    $('#sBind').textContent = state.fed ? 'meal pulse' : 'quiet';
+  } else {
+    $('#sHalf').textContent = '~1 week';
+    $('#sReach').textContent = '~89% SC';
+    $('#sBind').textContent = '>99% albumin';
+  }
+  $('#note').textContent = explainer();
+  $('#sigVal').textContent = state.signal;
+}
+function viewMode() {
+  const whole = state.view === 'whole';
+  const exp = state.view === 'exploded';
+  $('#body').style.opacity = exp ? 0.08 : whole ? 0.9 : 0.35;
+  $$('.cluster').forEach(g => {
+    const part = g.dataset.part;
+    let t = 'translate(0,0)';
+    if (exp) {
+      const map = { lcell: '-90,70', dpp4: '-20,-10', pancreas: '80,40', stomach: '-140,-20', ap: '40,-90', arc: '130,-40' };
+      t = 'translate(' + (map[part] || '0,0') + ')';
+    }
+    g.style.transform = t;
+  });
+  const showNative = state.follow !== 'analog';
+  const showAnalog = state.follow !== 'native';
+  $('#pNative').style.opacity = showNative ? (state.fed ? 0.95 : 0.25) : 0.06;
+  $('#pAnalog').style.opacity = showAnalog ? 0.95 : 0.06;
+  $('#pVagus').style.opacity = state.view === 'whole' ? 0.2 : 0.7;
+}
+function bindSeg(id, fn) {
+  $('#' + id).addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    fn(b.dataset.v);
+    setSeg(id, b.dataset.v);
+    viewMode(); meters();
+  });
+}
+bindSeg('follow', v => state.follow = v);
+bindSeg('view', v => state.view = v);
+bindSeg('state', v => state.fed = v === 'fed');
+$('#signal').addEventListener('input', e => { state.signal = +e.target.value; meters(); });
+$$('.node').forEach(n => {
+  n.addEventListener('mouseenter', () => {
+    state.hover = n.dataset.id;
+    n.classList.add('active');
+    const c = copy[n.dataset.id];
+    if (!c) return;
+    const tip = $('#tip');
+    tip.innerHTML = '<b>' + c[0] + '</b>' + c[1];
+    tip.style.display = 'block';
+    meters();
+  });
+  n.addEventListener('mouseleave', () => {
+    state.hover = null;
+    n.classList.remove('active');
+    $('#tip').style.display = 'none';
+    meters();
+  });
+});
+$('#stage').addEventListener('mousemove', e => {
+  const tip = $('#tip');
+  if (tip.style.display === 'block') {
+    tip.style.left = (e.clientX - $('#stage').getBoundingClientRect().left + 16) + 'px';
+    tip.style.top = (e.clientY - $('#stage').getBoundingClientRect().top + 16) + 'px';
+  }
+});
+function dots() {
+  const svg = $('#scene');
+  function spawn(path, color, speed, life) {
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    p.setAttribute('r', 3.2);
+    p.setAttribute('fill', color);
+    p.setAttribute('filter', 'url(#glow)');
+    svg.getElementById('world').appendChild(p);
+    const len = path.getTotalLength();
+    let t = 0;
+    const step = () => {
+      t += speed;
+      if (t > 1) { p.remove(); return; }
+      const pt = path.getPointAtLength(t * len);
+      p.setAttribute('cx', pt.x);
+      p.setAttribute('cy', pt.y);
+      p.setAttribute('opacity', String(1 - t * 0.15));
+      requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+  setInterval(() => {
+    if (state.follow !== 'analog' && (state.fed || Math.random() < 0.15)) spawn($('#pNative'), '#3db8b0', 0.008 + Math.random()*0.004);
+    if (state.follow !== 'native') spawn($('#pAnalog'), '#e0a24b', 0.006 + state.signal/12000);
+  }, 220);
+}
+viewMode(); meters(); dots();
+</script>
+</body>
+</html>
